@@ -1,5 +1,5 @@
 """
-train_model.py — Train & evaluate multiple classifiers on the Obesity dataset.
+train_model.py — Train & evaluate the multiple classifiers on the Obesity dataset.
 
 Models trained:
   1. Random Forest
@@ -76,6 +76,7 @@ def _evaluate(model, X_test, y_test, n_classes: int) -> dict:
         metrics["ROC-AUC"] = np.nan
 
     return metrics
+
 
 
 def train_and_evaluate():
