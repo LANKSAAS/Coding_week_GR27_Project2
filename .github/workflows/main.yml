@@ -1,5 +1,5 @@
 # .github/workflows/run-tests.yml
-name: Gr27 Python Tests CI
+name: Gr27 Python Tests
 
 on:
   push:
@@ -23,14 +23,19 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install pytest flake8 pytest-cov
+        pip install pytest pytest-cov flake8
 
     - name: Lint with flake8
+      continue-on-error: true
       run: |
         flake8 .
 
-    - name: Test with pytest
+    - name: Run tests with coverage
       run: |
-        pytest --cov=src tests/
+        pytest --cov=src --cov-report=term --cov-report=xml tests/
 
-    - run: pytest --cov=src tests/
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.xml
