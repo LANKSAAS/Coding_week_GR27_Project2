@@ -78,6 +78,7 @@ def _evaluate(model, X_test, y_test, n_classes: int) -> dict:
     return metrics
 
 
+
 def train_and_evaluate():
     """Full training pipeline: fetch → preprocess → train → evaluate → save."""
 
