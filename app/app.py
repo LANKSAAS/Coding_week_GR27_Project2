@@ -36,7 +36,7 @@ st.set_page_config(
 # PREMIUM STYLES — LIGHT CREATIVE THEME
 # --------------------------------------------------
 
-st.markdown("""
+st.markdown(r"""
 <style>
 /* ---------- Google Fonts ---------- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;600;700;800&display=swap');
@@ -569,7 +569,8 @@ if st.session_state.step == 0:
         <div class="home-badge">GR 27</div>
         <p class="home-desc">
             Diagnostic intelligent du risque d'obésité propulsé par
-            l'intelligence artificielle. Répondez à quelques questions
+            l'intelligence artificielle. 
+            Répondez à quelques questions
             pour obtenir votre évaluation personnalisée.
         </p>
         <div class="home-features">
@@ -582,7 +583,7 @@ if st.session_state.step == 0:
 
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        if st.button("🚀  Commencer le diagnostic", use_container_width=True):
+        if st.button("🚀  Commencer le diagnostic", width="stretch"):
             st.session_state.step = 1
             st.rerun()
 
@@ -618,7 +619,7 @@ elif st.session_state.step == 1:
             st.session_state.step = 0
             st.rerun()
     with col_b:
-        if st.button("Suivant ➡️", use_container_width=True):
+        if st.button("Suivant ➡️", width="stretch"):
             st.session_state.step = 2
             st.rerun()
 
@@ -665,11 +666,11 @@ elif st.session_state.step == 2:
 
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("⬅️ Retour", use_container_width=True):
+        if st.button("⬅️ Retour", width="stretch"):
             st.session_state.step = 1
             st.rerun()
     with col_b:
-        if st.button("Suivant ➡️", use_container_width=True):
+        if st.button("Suivant ➡️", width="stretch"):
             st.session_state.step = 3
             st.rerun()
 
@@ -712,11 +713,11 @@ elif st.session_state.step == 3:
 
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("⬅️ Retour", use_container_width=True):
+        if st.button("⬅️ Retour", width="stretch"):
             st.session_state.step = 2
             st.rerun()
     with col_b:
-        if st.button("🔬 Lancer le diagnostic", use_container_width=True):
+        if st.button("🔬 Lancer le diagnostic", width="stretch"):
             st.session_state.step = 4
             st.rerun()
 
@@ -803,7 +804,7 @@ elif st.session_state.step == 4:
         }
     ))
     fig_bmi.update_layout(paper_bgcolor="rgba(0,0,0,0)", font_color="#1e293b", height=280)
-    st.plotly_chart(fig_bmi, use_container_width=True)
+    st.plotly_chart(fig_bmi, width="stretch")
 
     # ---- Lifestyle Radar ----
     st.markdown('<div class="result-section">🕸️ Profil de Mode de Vie</div>', unsafe_allow_html=True)
@@ -830,7 +831,7 @@ elif st.session_state.step == 4:
         font_color="#1e293b",
         height=320
     )
-    st.plotly_chart(fig_radar, use_container_width=True)
+    st.plotly_chart(fig_radar, width="stretch")
 
     # ---- Probability Distribution ----
     st.markdown('<div class="result-section">📈 Distribution des Probabilités</div>', unsafe_allow_html=True)
@@ -856,7 +857,7 @@ elif st.session_state.step == 4:
         xaxis=dict(gridcolor="rgba(0,0,0,0)"),
         yaxis=dict(gridcolor="#e2e8f0")
     )
-    st.plotly_chart(fig_prob, use_container_width=True)
+    st.plotly_chart(fig_prob, width="stretch")
 
     # ---- SHAP ----
     st.markdown('<div class="result-section">🔍 Explicabilité du Modèle (SHAP)</div>', unsafe_allow_html=True)
@@ -881,7 +882,7 @@ elif st.session_state.step == 4:
 
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        if st.button("🏠  Recommencer", use_container_width=True):
+        if st.button("🏠  Recommencer", width="stretch"):
             st.session_state.step = 0
             st.rerun()
 
