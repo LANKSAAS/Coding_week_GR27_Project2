@@ -892,3 +892,4 @@ elif st.session_state.step == 4:
         Modèle ML : CatBoost &nbsp;|&nbsp; Explicabilité : SHAP
     </div>
     """, unsafe_allow_html=True)
+
