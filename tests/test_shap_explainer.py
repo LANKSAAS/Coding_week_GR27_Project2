@@ -1,5 +1,5 @@
 """
-Tests for SHAP explanation module.
+Tests for the SHAP explanation module.
 
 These tests ensure that:
 - the trained model can be loaded
