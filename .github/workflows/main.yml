@@ -12,12 +12,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
     - uses: actions/checkout@v3
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.12'
+        cache: pip
 
     - name: Install dependencies
       run: |
@@ -30,6 +32,28 @@ jobs:
       run: |
         flake8 .
 
+    # tests rapides
+    - name: Run fast tests
+      run: |
+        pytest \
+          tests/test_data_processing_optimized.py \
+          tests/test_data_leakage.py
+
+    # cache du modèle
+    - name: Restore trained model cache
+      id: cache-model
+      uses: actions/cache@v3
+      with:
+        path: data/best_model.joblib
+        key: model-${{ hashFiles('src/train_model.py', 'data/*.csv') }}
+
+    # training seulement si nécessaire
+    - name: Train model if needed
+      if: steps.cache-model.outputs.cache-hit != 'true'
+      run: |
+        python src/train_model.py
+
+    # tests complets
     - name: Run tests with coverage
       run: |
         pytest --cov=src --cov-report=term --cov-report=xml tests/

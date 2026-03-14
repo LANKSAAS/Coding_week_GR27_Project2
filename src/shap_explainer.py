@@ -1,98 +1,247 @@
 """
-shap_explainer.py — SHAP-based model explainability utilities.
+SHAP model explanation module.
 
-Provides helpers to compute SHAP values using ``TreeExplainer`` and to
-generate summary, feature-importance, and per-prediction waterfall plots.
+This script loads the trained model and dataset,
+computes SHAP values, and generates interpretability
+visualizations for the machine learning model.
+
+Generated figures:
+    data/shap_figures/
+        ├── shap_summary.png
+        ├── shap_feature_importance.png
+        └── shap_waterfall.png
+
+To reduce runtime, only a subset of samples is used
+for SHAP computation.
 """
 
-import shap
-import matplotlib.pyplot as plt
+import sys
+import os
+import logging
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import shap
+import joblib
+
+# ---------------------------------------------------------------------
+# Allow pytest / script execution without path issues
+# ---------------------------------------------------------------------
+
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)
+
+# ---------------------------------------------------------------------
+# Project imports
+# ---------------------------------------------------------------------
+
+from src.data_processing import fetch_dataset, preprocess_data
+
+# ---------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+DATA_DIR = ROOT_DIR / "data"
+
+MODEL_PATH = DATA_DIR / "best_model.joblib"
+
+SHAP_DIR = DATA_DIR / "shap_figures"
+
+SHAP_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_shap_explainer(model, X_background):
-    """Create a SHAP TreeExplainer.
+# ---------------------------------------------------------------------
+# Load model
+# ---------------------------------------------------------------------
 
-    Parameters
-    ----------
-    model : tree-based estimator
-        A fitted model compatible with ``shap.TreeExplainer``.
-    X_background : pd.DataFrame or np.ndarray
-        A representative background dataset (e.g. a sample of the
-        training set) used for computing expected values.
+def load_model():
 
-    Returns
-    -------
-    shap.TreeExplainer
-    """
-    return shap.TreeExplainer(model, X_background)
+    logger.info("Loading trained model")
 
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(
+            f"Model not found: {MODEL_PATH}"
+        )
 
-def get_shap_values(explainer, X):
-    """Compute SHAP values for the given data.
+    model = joblib.load(MODEL_PATH)
 
-    Returns
-    -------
-    shap.Explanation
-    """
-    return explainer(X)
+    return model
 
 
-def plot_summary(shap_values, feature_names=None, max_display=16, show=True):
-    """Global beeswarm summary plot."""
-    plt.figure(figsize=(10, 8))
+# ---------------------------------------------------------------------
+# Load and preprocess dataset
+# ---------------------------------------------------------------------
+
+def load_data():
+
+    logger.info("Loading dataset")
+
+    df = fetch_dataset()
+
+    X_train, X_test, y_train, y_test, preprocessor, _ = preprocess_data(df)
+
+    # Extract feature names from ColumnTransformer
+    feature_names = preprocessor.get_feature_names_out()
+
+    X_train_df = pd.DataFrame(X_train, columns=feature_names)
+
+    X_test_df = pd.DataFrame(X_test, columns=feature_names)
+
+    return X_train_df, X_test_df, feature_names
+
+# ---------------------------------------------------------------------
+# Compute SHAP values (optimized)
+# ---------------------------------------------------------------------
+
+def compute_shap_values(model, X_train_df, X_test_df):
+
+    logger.info("Computing SHAP values (TreeExplainer optimized)")
+
+    # Smaller subset for explanation
+    sample_size = min(120, len(X_test_df))
+
+    X_explain = X_test_df.sample(sample_size, random_state=42)
+
+    # TreeExplainer optimized for tree-based models
+    explainer = shap.TreeExplainer(model)
+
+    shap_values = explainer(X_explain)
+
+    return shap_values, X_explain
+
+
+# ---------------------------------------------------------------------
+# SHAP summary plot
+# ---------------------------------------------------------------------
+
+def plot_summary(shap_values, X_explain_df):
+
+    logger.info("Generating SHAP summary plot")
+
     shap.summary_plot(
         shap_values,
-        feature_names=feature_names,
-        max_display=max_display,
-        show=False,
+        X_explain_df,
+        show=False
     )
+
     plt.tight_layout()
-    if show:
-        plt.show()
-    return plt.gcf()
+
+    path = SHAP_DIR / "shap_summary.png"
+
+    plt.savefig(path, dpi=300)
+
+    logger.info(f"Saved summary plot → {path}")
+
+    plt.close()
 
 
-def plot_feature_importance(shap_values, feature_names=None, max_display=16, show=True):
-    """Mean |SHAP| bar plot."""
-    plt.figure(figsize=(10, 6))
+# ---------------------------------------------------------------------
+# SHAP feature importance plot
+# ---------------------------------------------------------------------
+
+def plot_feature_importance(shap_values, X_explain_df):
+
+    logger.info("Generating SHAP feature importance plot")
+
     shap.summary_plot(
         shap_values,
-        feature_names=feature_names,
+        X_explain_df,
         plot_type="bar",
-        max_display=max_display,
-        show=False,
+        show=False
     )
+
     plt.tight_layout()
-    if show:
-        plt.show()
-    return plt.gcf()
+
+    path = SHAP_DIR / "shap_feature_importance.png"
+
+    plt.savefig(path, dpi=300)
+
+    logger.info(f"Saved feature importance plot → {path}")
+
+    plt.close()
 
 
-def plot_waterfall(shap_values, idx: int = 0, max_display: int = 14, show: bool = True):
-    """Single-prediction waterfall plot.
+# ---------------------------------------------------------------------
+# SHAP waterfall plot (multi-class compatible)
+# ---------------------------------------------------------------------
 
-    Parameters
-    ----------
-    shap_values : shap.Explanation
-        Full SHAP explanation object (multi- or single-output).
-    idx : int
-        Row index of the instance to explain.
-    max_display : int
-        Number of features to display.
-    show : bool
-        Whether to call ``plt.show()``.
-    """
-    plt.figure(figsize=(10, 6))
-    # For multi-class, shap_values is 3-D; pick the predicted class
-    if hasattr(shap_values, "values") and shap_values.values.ndim == 3:
-        predicted_class = int(np.argmax(shap_values.values[idx].sum(axis=0)))
-        sv = shap_values[idx, :, predicted_class]
-    else:
-        sv = shap_values[idx]
+def plot_waterfall(shap_values, X_explain_df, model, index=0):
 
-    shap.plots.waterfall(sv, max_display=max_display, show=False)
+    logger.info("Generating SHAP waterfall plot")
+
+    # Predict class of the selected sample
+    prediction = model.predict(X_explain_df.iloc[[index]])[0]
+
+    # Extract explanation for predicted class
+    explanation = shap_values[index, :, prediction]
+
+    shap.plots.waterfall(
+        explanation,
+        show=False
+    )
+
     plt.tight_layout()
-    if show:
-        plt.show()
-    return plt.gcf()
+
+    path = SHAP_DIR / "shap_waterfall.png"
+
+    plt.savefig(path, dpi=300)
+
+    logger.info(f"Saved waterfall plot → {path}")
+
+    plt.close()
+
+
+# ---------------------------------------------------------------------
+# Main execution
+# ---------------------------------------------------------------------
+
+def main():
+
+    logger.info("Starting SHAP explanation pipeline")
+
+    model = load_model()
+
+    X_train_df, X_test_df, feature_names = load_data()
+
+    shap_values, X_explain_df = compute_shap_values(
+        model,
+        X_train_df,
+        X_test_df
+    )
+
+    plot_summary(
+        shap_values,
+        X_explain_df
+    )
+
+    plot_feature_importance(
+        shap_values,
+        X_explain_df
+    )
+
+    plot_waterfall(
+        shap_values,
+        X_explain_df,
+        model
+    )
+
+    logger.info("SHAP explanation completed")
+
+
+# ---------------------------------------------------------------------
+
+if __name__ == "__main__":
+
+    main()
