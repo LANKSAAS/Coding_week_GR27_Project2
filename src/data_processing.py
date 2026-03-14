@@ -1,164 +1,269 @@
 """
-data_processing.py — Data fetching, memory optimization, and preprocessing.
+data_processing.py
+==================
 
-This module provides utilities to:
-  1. Download the UCI Obesity dataset via the `ucimlrepo` package.
-  2. Optimize DataFrame memory by downcasting numeric types.
-  3. Preprocess data (encode categoricals, train/test split).
+Data ingestion and preprocessing utilities for the Obesity Risk Prediction project.
+
+This module centralizes all operations related to dataset preparation:
+    1. Downloading the dataset from the UCI Machine Learning Repository
+    2. Caching the dataset locally
+    3. Reducing DataFrame memory usage
+    4. Building a robust preprocessing pipeline
+    5. Splitting the dataset into training and testing sets
+
+The preprocessing pipeline follows standard machine learning best practices:
+    • Missing value imputation
+    • Feature scaling for numerical variables
+    • One-hot encoding for categorical variables
+
+The resulting pipeline is compatible with scikit-learn models and can be
+saved alongside trained models for reproducible inference.
+
+Dataset:
+    "Estimation of Obesity Levels Based on Eating Habits and Physical Condition"
 """
 
 import os
+import logging
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+
+
+# ---------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------
+# Path configuration
+# ---------------------------------------------------------------------
+
 RAW_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 RAW_CSV_PATH = os.path.join(RAW_DATA_DIR, "obesity_data.csv")
+
 UCI_DATASET_ID = 544
 
+TARGET_COLUMN = "NObeyesdad"
 
-# ---------------------------------------------------------------------------
-# 1. Dataset fetching
-# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------
+# Dataset retrieval
+# ---------------------------------------------------------------------
+
 def fetch_dataset(force_download: bool = False) -> pd.DataFrame:
-    """Download the UCI Obesity dataset and cache it locally.
+    """
+    Download or load the obesity dataset.
 
-    Uses the ``ucimlrepo`` package to fetch dataset **544** (Estimation of
-    Obesity Levels Based on Eating Habits and Physical Condition).  The
-    resulting DataFrame is saved to ``data/raw/obesity_data.csv`` so that
-    subsequent calls load from disk instead of re-downloading.
+    This function retrieves the dataset from the UCI Machine Learning
+    Repository using the `ucimlrepo` package. To avoid unnecessary
+    network calls, the dataset is cached locally as a CSV file.
 
     Parameters
     ----------
-    force_download : bool, optional
-        If *True*, re-download even when the local CSV already exists.
+    force_download : bool
+        If True, the dataset is downloaded again even if cached locally.
 
     Returns
     -------
     pd.DataFrame
-        The full dataset with features **and** the target column
-        ``NObeyesdad``.
+        Full dataset including features and target column.
     """
+
     os.makedirs(RAW_DATA_DIR, exist_ok=True)
 
     if not force_download and os.path.exists(RAW_CSV_PATH):
-        print(f"[INFO] Loading cached dataset from {RAW_CSV_PATH}")
+        logger.info("Loading dataset from local cache")
         return pd.read_csv(RAW_CSV_PATH)
 
-    print("[INFO] Downloading dataset from UCI ML Repository (id=544) …")
-    from ucimlrepo import fetch_ucirepo
+    try:
+        from ucimlrepo import fetch_ucirepo
+    except ImportError:
+        raise ImportError(
+            "The 'ucimlrepo' package is required to download the dataset."
+        )
+
+    logger.info("Downloading dataset from UCI Machine Learning Repository")
 
     dataset = fetch_ucirepo(id=UCI_DATASET_ID)
 
-    # Combine features and target into a single DataFrame
-    df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+    df = pd.concat(
+        [dataset.data.features, dataset.data.targets],
+        axis=1
+    )
+
+    if TARGET_COLUMN not in df.columns:
+        raise ValueError(
+            f"Expected target column '{TARGET_COLUMN}' not found."
+        )
 
     df.to_csv(RAW_CSV_PATH, index=False)
-    print(f"[INFO] Dataset saved to {RAW_CSV_PATH}  ({len(df)} rows)")
+
+    logger.info(f"Dataset cached locally at {RAW_CSV_PATH}")
+
     return df
 
 
-# ---------------------------------------------------------------------------
-# 2. Memory optimization
-# ---------------------------------------------------------------------------
-def optimize_memory(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
-    """Reduce DataFrame memory usage by downcasting numeric types.
+# ---------------------------------------------------------------------
+# Memory optimization
+# ---------------------------------------------------------------------
 
-    * ``float64`` → ``float32``
-    * ``int64``   → ``int32``
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame.
-    verbose : bool, optional
-        If *True*, print before/after memory statistics.
-
-    Returns
-    -------
-    pd.DataFrame
-        The optimized DataFrame (a copy).
+def optimize_memory(df: pd.DataFrame) -> pd.DataFrame:
     """
-    before = df.memory_usage(deep=True).sum() / 1024**2  # MB
+    Reduce DataFrame memory usage by downcasting numeric types.
+
+    Converts:
+        float64 → float32
+        int64   → int32
+    """
+
+    before = df.memory_usage(deep=True).sum() / 1024**2
 
     df_opt = df.copy()
+
     for col in df_opt.select_dtypes(include=["float64"]).columns:
         df_opt[col] = df_opt[col].astype(np.float32)
+
     for col in df_opt.select_dtypes(include=["int64"]).columns:
         df_opt[col] = df_opt[col].astype(np.int32)
 
-    after = df_opt.memory_usage(deep=True).sum() / 1024**2  # MB
+    after = df_opt.memory_usage(deep=True).sum() / 1024**2
 
-    if verbose:
-        print(f"[Memory] Before: {before:.4f} MB  ->  After: {after:.4f} MB  "
-              f"(reduced {100 * (1 - after / before):.1f}%)")
+    logger.info(
+        f"Memory usage reduced from {before:.2f}MB to {after:.2f}MB"
+    )
 
     return df_opt
 
 
-# ---------------------------------------------------------------------------
-# 3. Preprocessing
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Preprocessing pipeline construction
+# ---------------------------------------------------------------------
+
+def build_preprocessing_pipeline(df: pd.DataFrame):
+    """
+    Create a scikit-learn preprocessing pipeline.
+
+    Numerical features:
+        • median imputation
+        • standard scaling
+
+    Categorical features:
+        • most frequent imputation
+        • one-hot encoding
+    """
+
+    categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
+
+    if TARGET_COLUMN in categorical_cols:
+        categorical_cols.remove(TARGET_COLUMN)
+
+    numerical_cols = df.select_dtypes(include=["number"]).columns.tolist()
+
+    if TARGET_COLUMN in numerical_cols:
+        numerical_cols.remove(TARGET_COLUMN)
+
+    numeric_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
+
+    categorical_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(handle_unknown="ignore")),
+        ]
+    )
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("numeric", numeric_pipeline, numerical_cols),
+            ("categorical", categorical_pipeline, categorical_cols),
+        ]
+    )
+
+    return preprocessor
+
+
+# ---------------------------------------------------------------------
+# Full preprocessing workflow
+# ---------------------------------------------------------------------
+
 def preprocess_data(
     df: pd.DataFrame,
-    target_col: str = "NObeyesdad",
     test_size: float = 0.2,
     random_state: int = 42,
 ):
-    """Encode categorical features, split into train/test sets.
+    """
+    Prepare dataset for machine learning training.
 
-    All non-numeric columns (except the target) are label-encoded.  The
-    target column is also label-encoded separately so that class names can
-    be recovered later.
+    Steps:
+        1. Separate features and target
+        2. Split dataset into train/test
+        3. Fit preprocessing pipeline on training data
+        4. Transform both train and test data
 
     Returns
     -------
-    X_train, X_test, y_train, y_test : array-like
-        Train/test splits.
-    label_encoders : dict[str, LabelEncoder]
-        Mapping of column name → fitted ``LabelEncoder`` (includes the
-        target under key ``"target"``).
-    feature_columns : list[str]
-        Ordered list of feature column names after encoding.
+    X_train : np.ndarray
+    X_test : np.ndarray
+    y_train : pd.Series
+    y_test : pd.Series
+    preprocessor : ColumnTransformer
+    feature_names : list
     """
-    df = df.copy()
-    label_encoders: dict[str, LabelEncoder] = {}
 
-    # Encode target
-    le_target = LabelEncoder()
-    df[target_col] = le_target.fit_transform(df[target_col])
-    label_encoders["target"] = le_target
+    if TARGET_COLUMN not in df.columns:
+        raise ValueError(
+            f"Target column '{TARGET_COLUMN}' not found."
+        )
 
-    # Encode categorical features
-    cat_cols = df.select_dtypes(include=["object"]).columns.tolist()
-    if target_col in cat_cols:
-        cat_cols.remove(target_col)
+    X = df.drop(columns=[TARGET_COLUMN])
+    y = df[TARGET_COLUMN]
 
-    for col in cat_cols:
-        le = LabelEncoder()
-        df[col] = le.fit_transform(df[col])
-        label_encoders[col] = le
-
-    feature_columns = [c for c in df.columns if c != target_col]
-    X = df[feature_columns]
-    y = df[target_col]
+    # Split BEFORE preprocessing (prevents data leakage)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state, stratify=y,
+        X,
+        y,
+        test_size=test_size,
+        stratify=y,
+        random_state=random_state,
     )
 
-    return X_train, X_test, y_train, y_test, label_encoders, feature_columns
+    preprocessor = build_preprocessing_pipeline(df)
+
+    X_train = preprocessor.fit_transform(X_train)
+
+    X_test = preprocessor.transform(X_test)
+
+    feature_names = preprocessor.get_feature_names_out()
+
+    return X_train, X_test, y_train, y_test, preprocessor, feature_names
 
 
-# ---------------------------------------------------------------------------
-# Quick CLI smoke-test
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# CLI smoke test
+# ---------------------------------------------------------------------
+
 if __name__ == "__main__":
+
     df = fetch_dataset()
-    print(df.head())
-    print(f"\nShape: {df.shape}")
-    df_opt = optimize_memory(df)
+
+    df = optimize_memory(df)
+
+    X_train, X_test, y_train, y_test, pipeline, feature_names = preprocess_data(df)
+
+    logger.info(f"Training set shape: {X_train.shape}")
+    logger.info(f"Test set shape: {X_test.shape}")
+    logger.info(f"Number of features after preprocessing: {len(feature_names)}")
