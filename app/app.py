@@ -887,7 +887,7 @@ elif st.session_state.step == 4:
     st.markdown("""
     <div class="app-footer">
         AI Obesity Risk Prediction — <strong>GR 27</strong> — École Centrale Casablanca<br>
-        Modèle ML : CatBoost &nbsp;|&nbsp; Explicabilité : SHAP<br>
+        Modèle ML : LightGBM &nbsp;|&nbsp; Explicabilité : SHAP<br>
         Powered by Ali HOUAS - Nour EL HOUDA - Yeintaandi Abdoul Aziz LANKOUANDE - Ousmane ZONGO<br>
     </div>
     """, unsafe_allow_html=True)
