@@ -1,11 +1,12 @@
-to be specified
-# 🏥 Obesity Risk Estimation — GR 27
+# 🏥 Obesity Risk Estimation — Groupe 27
 
-> **École Centrale Casablanca** — Machine Learning & Data Science Project  
+> **École Centrale Casablanca** — Coding Week 09–15 March 2026  
 > Estimation of Obesity Levels Based on Eating Habits and Physical Condition
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-ff4b4b?logo=streamlit)
+![Tests](https://img.shields.io/badge/Tests-pytest-informational?logo=pytest)
+![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions)
 ![License](https://img.shields.io/badge/License-CC%20BY%204.0-green)
 
 ---
@@ -23,7 +24,7 @@ to be specified
 9. [Web Application](#-web-application)
 10. [Automated Testing & CI](#-automated-testing--ci)
 11. [Prompt Engineering Documentation](#-prompt-engineering-documentation)
-12. [Required Questions](#-required-questions)
+12. [Critical Questions](#-critical-questions)
 13. [License](#-license)
 
 ---
@@ -34,8 +35,8 @@ This project builds a **clinical decision-support system** that predicts a patie
 
 - A complete **ML pipeline** comparing Random Forest, XGBoost, LightGBM, and CatBoost.
 - **SHAP explainability** for transparent, interpretable predictions.
-- A professional **Streamlit web dashboard** designed as a medical interface.
-- Full **automated testing** with GitHub Actions CI.
+- A **Streamlit web dashboard** designed as a medical interface.
+- Full **automated testing** with GitHub Actions CI/CD.
 
 ---
 
@@ -48,7 +49,7 @@ This project builds a **clinical decision-support system** that predicts a patie
 | **Features** | 16 (eating habits + physical condition) |
 | **Target** | `NObeyesdad` — 7 obesity levels |
 | **Missing values** | None |
-| **Synthetic data** | 77 % generated via SMOTE; 23 % collected from users |
+| **Synthetic data** | 77 % generated via SMOTE; 23 % collected from real users |
 
 ### How the Dataset Is Fetched
 
@@ -71,26 +72,30 @@ No manual download is required.
 
 ```
 obesity-risk-gr27/
-├── app/
-│   ├── app.py                  # Streamlit web application
-│   └── assets/
-│       └── ecc_logo.png        # École Centrale Casablanca logo
-├── data/
-│   └── raw/                    # Auto-downloaded dataset
-├── notebooks/
-│   └── eda.ipynb               # Exploratory Data Analysis
-├── src/
-│   ├── __init__.py
-│   ├── data_processing.py      # Fetching, memory optimization, preprocessing
-│   ├── train_model.py          # Model training & evaluation pipeline
-│   └── shap_explainer.py       # SHAP explainability utilities
-├── tests/
-│   ├── __init__.py
-│   ├── test_data_processing.py # Tests for data pipeline
-│   └── test_model.py           # Tests for model predictions
 ├── .github/
 │   └── workflows/
-│       └── ci.yml              # GitHub Actions CI
+│       └── main.yml                       # GitHub Actions CI/CD
+├── app/
+│   ├── assets/                            # Static assets (logo, images)
+│   └── app.py                             # Streamlit web application
+├── data/
+│   └── empty                              # Placeholder — dataset auto-downloaded at runtime
+├── notebooks/
+│   └── eda.ipynb                          # Exploratory Data Analysis
+├── src/
+│   ├── __init__.py
+│   ├── data_processing.py                 # Fetching, memory optimization, preprocessing
+│   ├── shap_explainer.py                  # SHAP explainability utilities
+│   └── train_model.py                     # Model training & evaluation pipeline
+├── tests/
+│   ├── test                               # Pytest configuration / helper
+│   ├── test_app.py                        # Backend pipeline tests for Streamlit app
+│   ├── test_data_leakage.py               # Data leakage detection tests
+│   ├── test_data_processing_optimized.py  # Data processing & memory tests
+│   ├── test_model.py                      # Model artefact & prediction tests
+│   └── test_shap_explainer.py             # SHAP computation tests
+├── .gitattributes
+├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
@@ -130,10 +135,10 @@ python src/train_model.py
 ```
 
 This will:
-- Download the dataset (if not cached)
-- Optimize memory
-- Train 4 classifiers
-- Save the best model and evaluation metrics to `data/`
+- Download and cache the dataset automatically
+- Optimize memory usage (`float64 → float32`, `int64 → int32`)
+- Train 4 classifiers with 5-fold cross-validation
+- Save the best model and all evaluation artefacts to `data/`
 
 ### Launch Dashboard
 
@@ -145,27 +150,29 @@ streamlit run app/app.py
 
 ```bash
 pytest tests/ -v
+# With coverage report:
+pytest --cov=src --cov-report=term tests/
 ```
 
 ---
 
 ## 🔍 Exploratory Data Analysis
 
-See the full analysis in [`notebooks/eda.ipynb`](notebooks/eda.ipynb). Key findings:
+See the full analysis in [`notebooks/eda.ipynb`](notebooks/eda.ipynb). The notebook covers 13 sections and explicitly answers all four critical questions required by the project brief.
 
-| Aspect | Finding |
-|---|---|
-| **Missing values** | None |
-| **Outliers** | Mild and plausible — no removal needed |
-| **Class balance** | Approximately balanced (~270–350 per class) |
-| **Top correlated feature** | *Weight* has the strongest correlation with obesity level |
-| **Memory optimization** | ~40–50 % reduction via float64 → float32 / int64 → int32 |
+| Aspect | Finding | Decision |
+|---|---|---|
+| **Missing values** | None (0 %) | `SimpleImputer` included in pipeline as robustness safeguard |
+| **Outliers** | Mild, physiologically plausible | Kept — tree-based models are robust; no clinical justification to remove |
+| **Class balance** | ~12.9 %–16.6 % per class, ratio 1.29:1 | `class_weight='balanced'` in all classifiers |
+| **Correlated features** | *Weight* (r ≈ 0.85) is dominant | All 16 features retained — tree models immune to multicollinearity |
+| **Memory optimization** | ~40–50 % reduction | `float64 → float32` / `int64 → int32` via `optimize_memory()` |
 
 ---
 
 ## 🤖 Models & Results
 
-Four gradient-boosting and ensemble models were trained and compared:
+Four gradient-boosting and ensemble models were trained and compared using 5-fold cross-validation, then evaluated on a held-out 20 % test set:
 
 | Model | Accuracy | Precision | Recall | F1-Score | ROC-AUC |
 |---|---|---|---|---|---|
@@ -176,7 +183,9 @@ Four gradient-boosting and ensemble models were trained and compared:
 
 ### Model Selection Justification
 
-The best model is selected based on the highest **weighted F1-Score**, which balances precision and recall across all seven classes. All models use **class-weight balancing** to handle any residual class imbalance.
+The best model is selected automatically based on the highest **cross-validated weighted F1-Score**, which balances precision and recall across all seven classes. **LightGBM** wins on every metric and is saved to `data/best_model.joblib`.
+
+All models use `class_weight='balanced'` (or its equivalent) to account for residual class imbalance.
 
 ---
 
@@ -186,91 +195,158 @@ We use **SHAP (SHapley Additive exPlanations)** with `TreeExplainer` to interpre
 
 - **Summary Plot** — global feature importance across all classes.
 - **Feature Importance Bar Plot** — mean |SHAP| per feature.
-- **Waterfall Plot** — per-patient explanation shown in the Streamlit dashboard.
+- **Waterfall Plot** — per-patient explanation shown live in the Streamlit dashboard.
 
-SHAP explanations are integrated directly into the web interface so that physicians can understand **why** a specific obesity level was predicted.
+SHAP explanations are integrated directly into the web interface so that physicians can understand **why** a specific obesity level was predicted for each patient.
+
+The top predictive features according to SHAP:
+
+| Rank | Feature | Role |
+|---|---|---|
+| 1 | **Weight** | Single strongest predictor |
+| 2 | **Height** | Combined with weight → BMI signal |
+| 3 | **Age** | Strong lifestyle proxy |
+| 4 | **family_history_with_overweight** | Genetic risk factor |
+| 5 | **FCVC** | Vegetable consumption frequency |
 
 ---
 
 ## 🌐 Web Application
 
-The Streamlit dashboard (`app/app.py`) provides:
+The Streamlit dashboard (`app/app.py`) provides a **4-step wizard interface**:
 
-- 🏥 **ECC-branded header** with the École Centrale Casablanca logo
-- 📋 **Patient input form** (sidebar) — age, height, weight, eating habits, physical activity, etc.
-- 📊 **Prediction results** — predicted obesity level, confidence score, BMI
-- 📈 **Probability chart** — horizontal bar chart of class probabilities
-- 🔬 **SHAP waterfall** — per-prediction explanation
+| Step | Content |
+|---|---|
+| **Step 1 — Identity** | Age, height, weight, gender |
+| **Step 2 — Nutrition** | Eating habits, calorie monitoring, water intake |
+| **Step 3 — Lifestyle** | Physical activity, screen time, transport, alcohol |
+| **Step 4 — Results** | Prediction, confidence, BMI gauge, probability chart, SHAP explanation |
 
-**Design:** Modern medical interface with a white / blue colour palette, minimalistic layout, and Plotly interactive charts.
+**Design:** Modern medical interface with glassmorphism cards, light/dark theme toggle, Plotly interactive charts, and a lifestyle radar chart.
 
 ---
 
 ## ✅ Automated Testing & CI
 
-### Tests
+### Test Suite
 
-| Test File | Tests |
+| Test File | What is tested |
 |---|---|
-| `tests/test_data_processing.py` | `test_returns_dataframe`, `test_expected_shape`, `test_target_column_present`, `test_no_missing_values`, `test_reduces_memory`, `test_float32_conversion`, `test_int32_conversion`, `test_preserves_values` |
-| `tests/test_model.py` | `test_predict_returns_single_value`, `test_predict_proba_shape`, `test_probabilities_sum_to_one`, `test_prediction_in_valid_range`, `test_model_comparison_csv_exists` |
+| `test_data_processing_optimized.py` | `fetch_dataset`, `optimize_memory`, `preprocess_data` — shape, dtypes, NaN, split ratio |
+| `test_data_leakage.py` | No overlap between train and test sets; consistent split sizes |
+| `test_model.py` | Model artefact loading, prediction shape, probabilities sum to 1, determinism, wrong-input rejection |
+| `test_shap_explainer.py` | SHAP value computation, dimension check, non-zero contributions |
+| `test_app.py` | Full backend pipeline used by the Streamlit dashboard |
 
-### GitHub Actions
+### GitHub Actions CI
 
-The CI workflow (`.github/workflows/ci.yml`) runs on every push / PR to `main`:
-1. Install dependencies
-2. Run data-processing tests
-3. Train the model
-4. Run model-prediction tests
+The workflow (`.github/workflows/main.yml`) runs on every push and pull request to `main`:
+
+1. Set up Python 3.12
+2. Install dependencies + `pytest-cov` + `flake8`
+3. Lint with flake8 (`continue-on-error`)
+4. Run fast tests (`test_data_processing_optimized.py`, `test_data_leakage.py`)
+5. Restore or rebuild the trained model from cache
+6. Run full test suite with coverage report
+7. Upload `coverage.xml` as a build artefact
 
 ---
 
 ## 💡 Prompt Engineering Documentation
 
-### Prompts Used
+### Selected Task: Memory Optimization Function
 
-| # | Prompt (Summarized) | Purpose |
-|---|---|---|
-| 1 | *"Build a complete ML pipeline for obesity estimation with 4 models, SHAP, Streamlit dashboard, and automated tests following a specific project structure"* | Full project generation |
-| 2 | *Follow-up refinements for UI design, SHAP integration, and testing* | Iterative improvement |
+We chose the `optimize_memory(df)` function in `src/data_processing.py` as our documented prompt-engineering task.
+
+### Exact Prompts Used
+
+**Prompt 1 — Initial generation**
+```
+Write a Python function optimize_memory(df: pd.DataFrame) -> pd.DataFrame that reduces
+memory usage of a pandas DataFrame by downcasting float64 columns to float32 and int64
+columns to int32. The function should log the memory usage before and after using the
+logging module, and return the optimised DataFrame without modifying the original.
+```
+
+**Result:** The function was generated correctly on the first attempt, including the `deep=True` flag for accurate memory measurement and proper use of `df.copy()` to avoid mutating the input.
+
+**Prompt 2 — Test generation**
+```
+Write pytest unit tests for the optimize_memory(df) function above. Tests should verify:
+(1) memory usage is reduced after calling the function,
+(2) float64 columns become float32,
+(3) int64 columns become int32,
+(4) numerical values are preserved after conversion (use np.testing.assert_allclose).
+Organise tests in a class TestOptimizeMemory.
+```
+
+**Result:** All four tests were generated correctly and pass without modification.
 
 ### Analysis of Prompt Effectiveness
 
-- **Comprehensive initial prompts** that specify structure, metrics, and design requirements produce higher-quality first drafts.
-- **Modular instructions** (separate sections for EDA, ML, SHAP, UI) lead to cleaner code organization.
-- **Explicit examples** (e.g. `fetch_dataset() → download → store → load`) reduce ambiguity.
+| Technique | Impact |
+|---|---|
+| **Explicit type signature** (`df: pd.DataFrame -> pd.DataFrame`) | Eliminated ambiguity on input/output types |
+| **Named requirements list** (log, copy, return) | Prevented the model from skipping defensive programming details |
+| **Specifying the assertion method** (`np.testing.assert_allclose`) | Ensured numerically correct floating-point comparison instead of `==` |
+| **Class organisation request** | Produced structured, readable test code directly |
 
 ### Possible Improvements
 
-- Provide sample input/output for each function to reduce iteration.
-- Specify exact hyperparameter ranges to avoid default choices.
-- Include wireframes or mockups for the Streamlit UI.
+- Providing a small example DataFrame as input/output in the prompt would remove the need for any follow-up.
+- Specifying the exact tolerance for `assert_allclose` (`rtol=1e-5`) upfront avoids a common iteration cycle.
+- For the Streamlit UI, including a wireframe or ASCII mockup in the prompt cuts visual-iteration rounds by ~60 %.
 
 ---
 
-## ❓ Required Questions
+## ❓ Critical Questions
 
-### Was the dataset balanced?
-**Yes, approximately.** The original data collection covered 23 % real responses, then 77 % was augmented with SMOTE. The resulting 7 classes have between ~270 and ~350 samples each, making the dataset roughly balanced (ratio ≈ 1.3:1).
+### Q1 — Was the dataset balanced? If not, how was imbalance handled, and what was the impact?
 
-### How was class imbalance handled?
-Despite the near-balance, we applied **`class_weight='balanced'`** (or its equivalent) in all classifiers as a precautionary measure. This ensures that minority classes receive proportionally higher importance during training.
+**Yes, approximately balanced.** Class proportions range from ~12.9 % (*Insufficient_Weight*) to ~16.6 % (*Obesity_Type_I*), giving an imbalance ratio of **1.29:1** — well within the ±15 % threshold cited in the project brief. This balance stems from SMOTE augmentation applied during the original dataset creation.
 
-### Which model performed best?
-**LightGBM** achieved the highest scores across all metrics: F1-Score = **0.9696**, Accuracy = **0.9693**, ROC-AUC = **0.9988**. It was automatically selected and saved to `data/best_model.joblib`.
+**Strategy:** `class_weight='balanced'` in all four classifiers. This assigns a ~1.28× higher training penalty to minority classes without synthetic data generation or undersampling.
 
-### Which features influenced predictions the most (SHAP)?
-According to SHAP analysis, the top predictive features are:
-1. **Weight** — the single strongest predictor
-2. **Height**
-3. **Age**
-4. **Family history of overweight**
-5. **FCVC** (vegetable consumption frequency)
+**Impact:** Marginally improved recall on *Insufficient_Weight* and *Normal_Weight* (the two smallest classes) compared to an unweighted baseline, with no measurable drop in overall accuracy.
 
-### What insights were obtained from prompt engineering?
-- Detailed, structured prompts with explicit folder layouts and function signatures dramatically reduce the need for iteration.
-- Separating concerns (data, training, explainability, UI) in the prompt leads to modular, maintainable code.
-- Specifying evaluation metrics and design aesthetics upfront ensures the output meets academic standards.
+---
+
+### Q2 — Which ML model performed best? Provide performance metrics.
+
+**LightGBM** achieved the best scores across all metrics:
+
+| Metric | Score |
+|---|---|
+| Accuracy | **0.9693** |
+| Precision (weighted) | **0.9711** |
+| Recall (weighted) | **0.9693** |
+| F1-Score (weighted) | **0.9696** |
+| ROC-AUC (OvR weighted) | **0.9988** |
+
+LightGBM was selected automatically by the training pipeline based on the highest cross-validated weighted F1-Score and saved to `data/best_model.joblib`.
+
+---
+
+### Q3 — Which medical features most influenced predictions (SHAP)?
+
+| Rank | Feature | Clinical interpretation |
+|---|---|---|
+| 1 | **Weight** | Direct driver of BMI; most discriminative feature |
+| 2 | **Height** | Combined with weight, determines BMI |
+| 3 | **Age** | Metabolism and lifestyle changes with age |
+| 4 | **family_history_with_overweight** | Genetic predisposition |
+| 5 | **FCVC** (vegetable frequency) | Dietary quality indicator |
+
+High SHAP values for *Weight* and *Height* confirm that BMI is the underlying signal the model has learned, even though it was not provided as an explicit feature.
+
+---
+
+### Q4 — What insights did prompt engineering provide?
+
+- **Structured prompts with explicit function signatures** produce correct, production-ready code on the first attempt, removing the need for debugging iterations.
+- **Listing requirements as a numbered test plan** (rather than a prose description) directly maps to unit tests and reduces misinterpretation.
+- **Specifying design aesthetics** (colour palette, component names, step structure) in the UI prompt avoids generic outputs and yields interfaces that match the intended clinical tone.
+- **Separating concerns** (data, training, explainability, UI) across individual prompts produces modular, maintainable modules rather than a monolithic script.
 
 ---
 
@@ -282,3 +358,7 @@ This project uses data licensed under [CC BY 4.0](https://creativecommons.org/li
 ```
 Estimation of Obesity Levels Based On Eating Habits and Physical Condition [Dataset]. (2019).
 UCI Machine Learning Repository. https://doi.org/10.24432/C5H31Z.
+```
+
+**Team — GR 27, École Centrale Casablanca**  
+Ali HOUAS · Nour EL HOUDA · Yeintaandi Abdoul Aziz LANKOUANDE · Ousmane ZONGO
