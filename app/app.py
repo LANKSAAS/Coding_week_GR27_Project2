@@ -26,7 +26,7 @@ from src.data_processing import fetch_dataset, preprocess_data
 # --------------------------------------------------
 
 st.set_page_config(
-    page_title="AI Obesity Risk Dashboard — GR 27",
+    page_title="AI Obesity Risk Dashboard — Groupe 27",
     page_icon="🧠",
     layout="centered"
 )
@@ -568,10 +568,8 @@ if st.session_state.step == 0:
         <h1 class="home-title">Obesity Risk<br>Prediction</h1>
         <div class="home-badge">GR 27</div>
         <p class="home-desc">
-            Diagnostic intelligent du risque d'obésité propulsé par
-            l'intelligence artificielle. 
-            Répondez à quelques questions
-            pour obtenir votre évaluation personnalisée.
+            Diagnostic intelligent du risque d'obésité propulsé par l'intelligence artificielle.<br> 
+            Veuillez remplir ce questionnaire pour obtenir votre évaluation personnalisée.<br>
         </p>
         <div class="home-features">
             <div class="feature-chip">📋 Profil biométrique</div>
@@ -882,14 +880,15 @@ elif st.session_state.step == 4:
 
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        if st.button("🏠  Recommencer", width="stretch"):
+        if st.button("🏠  Recommencer un nouveau diagnostic", width="stretch"):
             st.session_state.step = 0
             st.rerun()
 
     st.markdown("""
     <div class="app-footer">
         AI Obesity Risk Prediction — <strong>GR 27</strong> — École Centrale Casablanca<br>
-        Modèle ML : CatBoost &nbsp;|&nbsp; Explicabilité : SHAP
+        Modèle ML : CatBoost &nbsp;|&nbsp; Explicabilité : SHAP<br>
+        Powered by Ali HOUAS - Nour EL HOUDA - Yeintaandi Abdoul Aziz LANKOUANDE - Ousmane ZONGO<br>
     </div>
     """, unsafe_allow_html=True)
 
