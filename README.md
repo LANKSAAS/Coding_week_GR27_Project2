@@ -1,4 +1,4 @@
-# 🏥 Obesity Risk Estimation — GR 27
+# 🏥 Obesity Risk Estimation — Groupe 27
 
 > **École Centrale Casablanca** — Coding Week 09–15 March 2026  
 > Estimation of Obesity Levels Based on Eating Habits and Physical Condition
@@ -35,7 +35,7 @@ This project builds a **clinical decision-support system** that predicts a patie
 
 - A complete **ML pipeline** comparing Random Forest, XGBoost, LightGBM, and CatBoost.
 - **SHAP explainability** for transparent, interpretable predictions.
-- A professional **Streamlit web dashboard** designed as a medical interface.
+- A **Streamlit web dashboard** designed as a medical interface.
 - Full **automated testing** with GitHub Actions CI/CD.
 
 ---
